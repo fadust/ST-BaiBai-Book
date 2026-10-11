@@ -16,6 +16,4 @@ The upstream GitHub URL supplies the Chinese original. Installation, compatibili
 
 Start with the main API, or configure auxiliary channels in Settings. Vector recall is optional and requires embedding and query-rewrite configuration; reranking is optional. Your existing settings and memory remain attached to the same SillyTavern account and chats.
 
-Known limitation: the reported manual summary merge issue remains under investigation. Live compression and vector recall have not been verified.
-
 Original project and authorship: [baibai-git/ST-BaiBai-Book](https://github.com/baibai-git/ST-BaiBai-Book). [Original Chinese README](README.zh-CN.md) and the upstream API reference are retained in the package.

@@ -6,13 +6,14 @@
   "scripts": {
     "sync-version": "node scripts/sync-version.mjs",
     "prebuild": "node scripts/sync-version.mjs",
-    "build": "vite build",
+    "build": "node localization/check.mjs && vite build --config vite.english.config.mjs",
     "test": "vitest run && node scripts/test-time-rel.mjs && node scripts/test-vector-depth.mjs && node scripts/test-memory-regressions.mjs",
+    "test:english": "node localization/check.mjs && vitest run --config vite.english.config.mjs",
     "test:time": "node scripts/test-time-rel.mjs",
     "test:vector-depth": "node scripts/test-vector-depth.mjs",
     "test:memory": "node scripts/test-memory-regressions.mjs",
     "prewatch": "node scripts/sync-version.mjs",
-    "watch": "vite build --watch --mode development"
+    "watch": "vite build --watch --mode development --config vite.english.config.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",

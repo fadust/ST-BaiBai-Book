@@ -1,0 +1,145 @@
+[
+  {
+    "file": "memory/migrate.ts",
+    "text": "悬念"
+  },
+  {
+    "file": "memory/apply.ts",
+    "text": "获得"
+  },
+  {
+    "file": "memory/migrate.ts",
+    "text": "懸念"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^\\\\d+\\\\s*年"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "\\\\d{1,2}\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "\\\\d{1,2}\\\\s*日?(?=$|\\\\s)"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^\\\\d{1,2}\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "[一二三四五六七八九十两零〇廿卅]"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "二十"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "三十"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "十"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "(?:初)?"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*年"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*日?"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^(?:约|大约)?\\\\s*(\\\\d{1,3}|"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "+)\\\\s*岁?$"
+  },
+  {
+    "file": "memory/timeTag.ts",
+    "text": "\\\\b[^>]*>[ \\\\t]*\\\\r?\\\\n(?:[ \\\\t]*(?:获得|消耗|失去)\\\\s+[^\\\\r\\\\n]*(?:\\\\r?\\\\n))+[ \\\\t]*<\\\\/"
+  },
+  {
+    "file": "memory/timeTag.ts",
+    "text": "\\\\b[^>]*>[ \\\\t]*\\\\r?\\\\n(?:[ \\\\t]*(?:设定|变更|新增|删除)\\\\s+[^\\\\r\\\\n]*(?:\\\\r?\\\\n))+[ \\\\t]*<\\\\/"
+  },
+  {
+    "file": "memory/timeTag.ts",
+    "text": "\\\\b[^>]*>[ \\\\t]*\\\\r?\\\\n(?:[ \\\\t]*(?:获得|消耗|失去|Gained|Consumed|Lost)\\\\s+[^\\\\r\\\\n]*(?:\\\\r?\\\\n))+[ \\\\t]*<\\\\/"
+  },
+  {
+    "file": "memory/timeTag.ts",
+    "text": "\\\\b[^>]*>[ \\\\t]*\\\\r?\\\\n(?:[ \\\\t]*(?:设定|变更|新增|删除|Set|Changed|Added|Removed)\\\\s+[^\\\\r\\\\n]*(?:\\\\r?\\\\n))+[ \\\\t]*<\\\\/"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^\\\\d+\\\\s*年"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "\\\\d{1,2}\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "\\\\d{1,2}\\\\s*日?(?=$|\\\\s)"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^\\\\d{1,2}\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "\\\\d{1,2}\\\\s*日?(?=$|\\\\s)"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*年"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*日?"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*年"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*月"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": ")\\\\s*日?"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "^(?:约|大约|about\\\\s+|approximately\\\\s+)?\\\\s*(\\\\d{1,3}|"
+  },
+  {
+    "file": "memory/timeRel.ts",
+    "text": "+)\\\\s*(?:岁|years?\\\\s*old)?$"
+  },
+  { "file": "memory/migrate.ts", "text": "摘要" },
+  { "file": "memory/migrate.ts", "text": "个把条块张根口份枚只颗支件套双对碗杯盘盆串束扎" },
+  { "file": "memory/engine.ts", "text": "柏宝书", "before": "m.name === '" }
+]

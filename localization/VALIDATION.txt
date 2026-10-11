@@ -1,0 +1,23 @@
+Base: baibai-git/ST-BaiBai-Book 1.3.1
+Upstream commit: cf83fcf7ea6c4267f8cf0683e66b40244f22c8cc
+
+PASS npm test: 192 tests; 810 timeline assertions, 12 vector-depth assertions, 53 memory-regression assertions.
+PASS npm run test:english: 21 tests, including English output rules, chronological full-memory batch extraction, cancellation, failures, legacy-leaf rebuilding, ID retention, and menu accessibility.
+PASS localization/check.mjs: 75 source files checked for text coverage, syntax, identifiers, embedded JSON keys and macro names.
+PASS npm run build: production English JS, CSS and source map generated.
+PASS git diff -- src: no upstream source content changes.
+
+English coverage: 1,649 distinct source text segments. Legacy parser and discriminator strings are intentionally preserved by file/context.
+The localization has no runtime translation-service dependency.
+
+Known upstream type errors: FloorPanel.vue lacks the conditionPatch label required by its Record type; the original Vite config lacks Node type declarations.
+The transformed source type check reproduces the same FloorPanel error and adds no new errors.
+The normal Vite large-bundle warning remains; no unrelated code splitting was introduced.
+
+PASS live SillyTavern 1.19.0 at http://127.0.0.1:8000/: installation, six pages, all five default prompt editors, dialog cancellation, invalid JSON validation, temporary-chat summary import and legacy variable-template import/export.
+PASS desktop 1280x900 and mobile 390x844 layout checks. No BaiBai Book console errors or warnings observed. See LIVE-TEST.md.
+PASS live menu follow-up: visible BaiBai Book label and inline SVG in the installed dark theme; mouse, Enter, and Space open the interface; one menu entry remains.
+PASS live memory repair: five existing summary-only leaves rebuilt through an auxiliary LLM channel; English summary output and item/location/NPC state updates verified in UI and saved data. Immediate comparison preserved original narrative, message count, leaf IDs, creation times, and swipe identities. A later reload retained the newer latest story message and confirmed persisted memory and stable leaf identities. Private chat data and backups are excluded from this repository.
+Not verified: every device/theme layout, other LLM models, or live compression/vector/rewrite outputs.
+Custom user prompts and existing data remain unchanged. Exact saved copies of the five current upstream defaults use their English equivalents without a storage rewrite.
+The one-click upstream updater is blocked to prevent replacing the English bundle; follow LOCALIZATION.md to merge and rebuild.

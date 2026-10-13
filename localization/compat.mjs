@@ -3,6 +3,14 @@ import ts from 'typescript';
 
 // Small, checked source patches keep language-dependent readers separate from upstream logic.
 export const patches = {
+  'index.ts': [
+    ["import '@/styles/theme.css';", "import '@/styles/theme.css';\nimport '../localization/layout.css';"],
+  ],
+  'components/FloorPanel.vue': [
+    ['`${x.name}·${x.title}`', '`${x.name} · ${x.title}`'],
+    ['`${labels[key]}:${protagonist[key]', '`${labels[key]}: ${protagonist[key]'],
+    ['`${verb}:${c}`', '`${verb}: ${c}`'],
+  ],
   'menu.ts': [
     ['<div class="extension_container interactable" tabindex="0">\n        <a id="${MENU_ITEM_ID}" class="list-group-item" href="#" title="柏宝书">\n          <i class="fa-solid fa-book-bookmark"></i>\n          <span>柏宝书</span>\n        </a>',
       '<div class="extension_container">\n        <div id="${MENU_ITEM_ID}" class="interactable" role="button" tabindex="0" title="Open BaiBai Book" aria-label="BaiBai Book" style="align-items: center">\n          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="flex: 0 0 20px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 3H20v19H6.5A2.5 2.5 0 0 1 4 19.5v-14A2.5 2.5 0 0 1 6.5 3Z"/><path d="M9 3v9l3-2 3 2V3"/></svg>\n          <span>BaiBai Book</span>\n        </div>'],

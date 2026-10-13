@@ -1,0 +1,85 @@
+/* English labels need room to wrap in the book and each message's shadow root. */
+.bbs-root {
+  overflow-wrap: anywhere;
+}
+
+.bbs-root :is(.bbs-npc-field, .bbs-focus-field) {
+  align-items: baseline;
+  gap: 12px;
+}
+
+.bbs-root :is(.bbs-npc-field, .bbs-focus-field) dt {
+  width: 9em;
+  max-width: 35%;
+  padding: 1px 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.bbs-root .bbs-npc-field.f-loc dt {
+  padding: 0 5px;
+}
+
+.bbs-root .bbs-fp-nlabel {
+  width: 7.5em;
+  max-width: 35%;
+}
+
+.bbs-root :is(.bbs-btn, .bbs-seg) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.bbs-root .bbs-btn > svg {
+  flex-shrink: 0;
+}
+
+.bbs-root :is(.bbs-section-head, .bbs-pending-head, .bbs-modal-foot, .bbs-data-export, .bbs-segmented, .bbs-npc-grouphead) {
+  flex-wrap: wrap;
+}
+
+.bbs-root .bbs-npc-grouptag {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.bbs-root :is(.bbs-field-label, .bbs-mini-field, .bbs-vec-io-item, .bbs-nav-item) {
+  min-width: 0;
+}
+
+.bbs-root .bbs-num-row .bbs-num {
+  flex: 0 1 7rem;
+  min-width: 0;
+  max-width: 35%;
+}
+
+.bbs-root .bbs-vec-io {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+
+.bbs-root .bbs-nav.is-top:not(.is-narrow) {
+  flex-wrap: wrap;
+}
+
+.bbs-root .bbs-nav.is-top .bbs-nav-item {
+  white-space: normal;
+}
+
+.bbs-root :is(.bbs-summary-badge, .bbs-summary-loc, .bbs-rel-time, .bbs-vec-backend) {
+  height: auto;
+  min-height: 22px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 480px) {
+  .bbs-root .bbs-assign-row {
+    flex-wrap: wrap;
+  }
+
+  .bbs-root .bbs-assign-row .bbs-assign-select {
+    flex-basis: 100%;
+  }
+}

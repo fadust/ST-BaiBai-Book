@@ -31,6 +31,10 @@ An existing chat was backed up before rebuilding five summary-only leaves throug
 
 ## Corrections made during testing
 
+### English spacing follow-up — October 13, 2026
+
+Tested the actual translated Vue pages with synthetic long English descriptions and the production CSS. All six pages passed horizontal overflow checks at 320, 390, 768, and 1280 pixels. Character and situation field labels retain a 12-pixel gap before their values. Expanded settings and the channel dialog were checked at 320 pixels; message-panel character editors retain an 8-pixel gap with wrapping English labels. The fixtures use no real chats or API requests and are excluded from the repository. Layout overrides and display-prefix changes remain isolated in `localization/`.
+
 Polished empty states, settings explanations, compression terminology, batch character limits, recall descriptions, count suffixes, and spacing in generated button/dialog labels. Corrected an age-rule translation that had reversed the instruction to omit unsupported ages. Changes remain in `localization/`; upstream source files are unchanged.
 
 ## Limits

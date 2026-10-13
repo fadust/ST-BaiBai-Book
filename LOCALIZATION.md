@@ -25,6 +25,8 @@ Batch summarize runs the full single-message extraction sequentially, so invento
 
 English summary budgets are measured in words, with matching character ceilings of 2,100 for detailed and 1,050 for concise summaries. Higher-level compression counts input words rather than characters; its original ratios remain unchanged. This avoids applying Chinese character budgets to English prose.
 
+English layout overrides live in `localization/layout.css`. Character and situation labels reserve space for English words, message editors use wider labels, and navigation, toolbars, dialogs, and settings controls wrap on narrow screens. Inline descriptive labels include spacing after colons. These styles are included in both the main book and message-panel shadow roots.
+
 ## Saved-data compatibility
 
 There is no saved-chat translation or schema migration. Existing `baibai_book` settings, `bbs_leaf` message extras, chat metadata, IDs, variable keys, and public interfaces stay unchanged. Unicode character names and custom variable paths are not rewritten.

@@ -1,6 +1,8 @@
 # BaiBai Book: English localization
 
-Based on upstream 1.3.1, commit `cf83fcf7ea6c4267f8cf0683e66b40244f22c8cc`.
+Based on upstream 1.3.2, commit `21f7488d8083f6293c3d4db654216f49fc35ea85`.
+
+Version 1.3.2 includes upstream fixes for manually replacing or clearing protagonist conditions and clearing NPC conditions or outfits. The English interface, prompts, compatibility readers, and layout overrides are retained.
 
 ## Install the built extension
 
@@ -48,7 +50,7 @@ npm run build
 
 The resulting `dist/index.js`, `dist/index.css`, and source map are ready to copy to the extension directory. No translation service or localization network request runs in the extension. The original runtime dependencies are unchanged.
 
-The upstream type check currently reports a missing `conditionPatch` label in `FloorPanel.vue` and missing Node type declarations in its Vite config. The English source check validates all transformed TS/Vue syntax; those existing type errors are documented rather than changed as part of localization.
+The upstream type check currently reports missing Node type declarations in its Vite config. Upstream 1.3.2 fixes the previous `conditionPatch` label type error in `FloorPanel.vue`. The English source check validates all transformed TS/Vue syntax; the remaining existing type errors are documented rather than changed as part of localization.
 
 ## Merge future upstream updates
 

@@ -546,7 +546,7 @@ export function buildTravelDraft(target: MemScene): string {
 }
 
 /** 组合当前结构化状态注入文本;无有意义状态时返回空串。 */
-export function buildStateInjectionText(): string {
+export function buildStateInjectionText({ includeRules = true } = {}): string {
   // 仅摘要模式保留内部状态供副 API、页面和公开查询使用,主模型只接收剧情摘要。
   if (apiSettings.summaryOnlyMode) return '';
 
@@ -644,7 +644,7 @@ export function buildStateInjectionText(): string {
   const hasState = memory.state.time || memory.state.location || (inj.sceneFocus && memory.state.sceneFocus) || hasProtagonist || (itemsOn && memory.items.length) || (scenesOn && memory.scenes.length) || (npcsOn && memory.npcs.length) || openPlans.length || hasVarState || (inj.lifeDetails && memory.lifeDetails.length);
   if (!hasState) return '';
   // 首尾私密简报框定,避免主模型把状态快照当成要复述/输出的模板(正文后跟吐一份状态)
-  return `${MEMORY_BRIEFING_NOTE}\n[当前状态]\n${st.join('\n')}\n${MEMORY_BRIEFING_END}`;
+  return `${includeRules ? MEMORY_BRIEFING_NOTE + '\n' : ''}[当前状态]\n${st.join('\n')}${includeRules ? '\n' + MEMORY_BRIEFING_END : ''}`;
 }
 
 /**
@@ -652,7 +652,8 @@ export function buildStateInjectionText(): string {
  * 保留给调试/兼容调用;实际注入由 refreshInjection 拆成两个 ST 槽位。
  */
 export function buildInjectionText(): string {
-  return [buildHistoryInjectionText(), buildStateInjectionText()].filter(Boolean).join('\n\n').trim();
+  const history = buildHistoryInjectionText();
+  return [history, buildStateInjectionText({ includeRules: !history })].filter(Boolean).join('\n\n').trim();
 }
 
 /** 按 ST 自身 tokenizer 不可用时的兜底口径估算文本 token 数。 */
@@ -669,10 +670,11 @@ function estimateTextTokens(blocks: string[]): number {
 export function estimateInjectionTokenBreakdown(): { summary: number; other: number } {
   if (!engineActiveHere()) return { summary: 0, other: 0 };
 
+  const history = buildHistoryInjectionText();
   return {
-    summary: estimateTextTokens([buildHistoryInjectionText()]),
+    summary: estimateTextTokens([history]),
     other: estimateTextTokens([
-      buildStateInjectionText(),
+      buildStateInjectionText({ includeRules: !history }),
       apiSettings.autoSummaryEnabled ? timeTagPrompt() : '',
     ]),
   };
@@ -691,8 +693,9 @@ export function refreshInjection(): void {
   if (typeof fn !== 'function') return;
   const stateDepth = resolveStateInjectionDepth(ctx?.chat ?? null);
   fn(LEGACY_INJECT_KEY, '', IN_CHAT, STATE_INJECT_DEPTH_BEFORE_LATEST_AI, false, ROLE_SYSTEM, null);
-  fn(HISTORY_INJECT_KEY, buildHistoryInjectionText(), IN_CHAT, HISTORY_INJECT_DEPTH, false, ROLE_SYSTEM, null);
-  fn(STATE_INJECT_KEY, buildStateInjectionText(), IN_CHAT, stateDepth, false, ROLE_SYSTEM, null);
+  const history = buildHistoryInjectionText();
+  fn(HISTORY_INJECT_KEY, history, IN_CHAT, HISTORY_INJECT_DEPTH, false, ROLE_SYSTEM, null);
+  fn(STATE_INJECT_KEY, buildStateInjectionText({ includeRules: !history }), IN_CHAT, stateDepth, false, ROLE_SYSTEM, null);
   // 时间标签固定提示词:跟随自动摘要开关注入主对话,关闭时注入空串(等于清除)
   fn(TIMETAG_INJECT_KEY, apiSettings.autoSummaryEnabled ? timeTagPrompt() : '', IN_CHAT, TIMETAG_INJECT_DEPTH, false, ROLE_SYSTEM, null);
 }

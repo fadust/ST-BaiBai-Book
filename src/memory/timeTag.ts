@@ -47,25 +47,9 @@ export const RULE_COMPLETE_TIME_ANCHOR = `【完整时间锚点格式(系统强�
 - 古风、奇幻等非公历题材不强制使用公历数字,但每个时间点都必须保留完整纪年与年份(如“庆历四年暮春·辰时三刻”),不得只写月、日、季节或时辰。`;
 
 /** 注入主对话的固定提示词默认值(可在设置里覆盖)。 */
-export const TIME_TAG_PROMPT = `【时间锚点要求(系统强制)】
-在你每次输出正文的最前面和最后面,各放一个时间标签,标明这段剧情的开始时刻与结束时刻:
-
-<${START_TAG}>1988/9/29 21:30</${START_TAG}>
-（正文……）
-<${END_TAG}>1988/9/29 21:45</${END_TAG}>
-
-规则:
-- 时间要具体、可明确定位,风格与正文世界观一致:现代题材用数字日期时间(如 1988/9/29 21:30);古风/奇幻题材用相应的纪年与时辰(如 庆历四年暮春·辰时三刻)。重点是「能定位到某一刻」,不强求阿拉伯数字。
-- 禁止"稍后""不久""某天""同一天"等无法定位到具体时刻的模糊说法。
-- 以上一段的结束时间为基准,结合本段剧情合理推进(对话约几分钟、用餐约一小时、过夜跨到次日等)。
-- 若这是故事开篇、此前没有任何已知时间,请你自行设定一个符合本世界观的具体起始时刻,之后以此为基准推进——这是为记忆系统建立时间锚点所必需的合理设定,不算编造;但绝不能用"某天"这类无法定位的占位词敷衍。
-- 标签只各出现一次,分别紧贴正文最前与最后;标签内只有时间,不要写别的。
-- 这两个标签是给记忆系统读取的锚点,请务必每次都输出。
+export const TIME_TAG_PROMPT = `TIME ANCHORS: Begin and end every story reply with exactly one <${START_TAG}>date/time</${START_TAG}> and <${END_TAG}>date/time</${END_TAG}> respectively, containing only timestamps. Continue from the last established ending time, advancing plausibly for events. Follow the world's calendar. If no time exists, establish one specific compatible starting time; never use vague placeholders such as "later" or "someday". These required tags are separate from private memory briefings, which must never be reproduced.
 
 ${RULE_COMPLETE_TIME_ANCHOR}
-
-【不需要输出的格式】
-私密简报里面的当前状态是记忆插件给你辅助了解前文的内容，而不是要求你在正文末尾输出的格式，在无论何时都不要在正文末尾输出私密简报
 
 ${LEDGER_PROTOCOL}`;
 

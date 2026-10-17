@@ -254,10 +254,10 @@ describe('jailbreak, briefing and query rewrite', () => {
 
   it('keeps the time-tag prompt on the anchor-initialising behaviour without the NVWA core', () => {
     expect(TIME_TAG_PROMPT).not.toContain('<nvwa_standalone_core>');
-    expect(TIME_TAG_PROMPT).toContain('【时间锚点要求(系统强制)】');
+    expect(TIME_TAG_PROMPT).toContain('TIME ANCHORS:');
     expect(TIME_TAG_PROMPT).toContain(`<${START_TAG}>`);
-    expect(TIME_TAG_PROMPT).toContain('请你自行设定一个符合本世界观的具体起始时刻');
-    expect(TIME_TAG_PROMPT).toContain('这是为记忆系统建立时间锚点所必需的合理设定,不算编造');
+    expect(TIME_TAG_PROMPT).toContain('If no time exists, establish one specific compatible starting time');
+    expect(TIME_TAG_PROMPT).toContain('Continue from the last established ending time');
     expect(TIME_TAG_PROMPT).toContain('bbs_items');
   });
 });

@@ -11,6 +11,6 @@ export default args => {
     if (id.startsWith('@sillytavern/')) return { id: '../../../../../' + id.slice('@sillytavern/'.length) + '.js', external: true };
     return resolve.call(this, id, ...rest);
   };
-  config.test.include = ['localization/**/*.test.ts', 'src/memory/conditionManualEdit.test.ts'];
+  config.test.include = ['localization/**/*.test.ts', 'src/memory/conditionManualEdit.test.ts', 'src/memory/actorInjection.test.ts'];
   return config;
 };

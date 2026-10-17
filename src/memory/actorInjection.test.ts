@@ -31,3 +31,24 @@ it('final host payload omits the owned actor and retains scene continuity, then 
     Object.assign(settings.apiSettings.injection, oldInjection);
   }
 });
+
+it('shares memory safeguards once across slots and retains them for either standalone slot', async () => {
+  const { MEMORY_BRIEFING_NOTE, MEMORY_BRIEFING_END } = await import('./prompts');
+  const { buildHistoryInjectionText, buildStateInjectionText, buildInjectionText } = await import('./inject');
+  const oldMode = settings.apiSettings.summaryOnlyMode;
+  settings.apiSettings.summaryOnlyMode = false;
+  Object.assign(memory, createEmptyMemory()); memory.state.location = 'Greyhaven';
+  const chat = [{ is_user: false, is_system: true, name: 'Narrator', mes: 'Ari waited.', extra: { bbs_leaf: { id: 'audit', text: 'Ari waited.', delta: {}, createdAt: 1, swipe: 0, v: 1 } } }];
+  const prompts = new Map<string, string>();
+  vi.spyOn(settings, 'engineActiveHere').mockReturnValue(true);
+  vi.spyOn(host, 'getContext').mockReturnValue({ chat, setExtensionPrompt: (key: string, text: string) => prompts.set(key, text) } as never);
+  try {
+    expect(buildHistoryInjectionText()).toContain(MEMORY_BRIEFING_END);
+    expect(buildStateInjectionText()).toContain(MEMORY_BRIEFING_END);
+    expect(buildInjectionText().split(MEMORY_BRIEFING_NOTE)).toHaveLength(2);
+    refreshInjection();
+    expect([...prompts.entries()].filter(([k]) => k !== 'baibai_book_time_tag').map(([, v]) => v).join('').split(MEMORY_BRIEFING_NOTE)).toHaveLength(2);
+    chat.length = 0; refreshInjection();
+    expect(prompts.get('baibai_book_memory_state')).toContain(MEMORY_BRIEFING_END);
+  } finally { settings.apiSettings.summaryOnlyMode = oldMode; }
+});

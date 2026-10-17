@@ -139,6 +139,7 @@ function bindMemoryWhenReady(attempt = 0) {
       // 时间标签:按开关注册/移除 ST 隐藏正则(幂等;开关变化的后续同步在 bindEngine 的 watch 里)
       syncTimeTagRegex();
       // 首屏:把当前聊天已有的记忆挂上注入
+      window.addEventListener('npc-codex:ownership-changed', () => refreshInjection());
       refreshInjection();
       // 楼内摘要锚点:按设置开关注入(bindFloorPanel 内 watch 开关 + 主题,immediate 首次同步)
       bindFloorPanel();

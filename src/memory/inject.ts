@@ -1,3 +1,4 @@
+import { continuityOwnedNpcs } from './actorOwnership';
 /**
  * 把记忆注入回主对话上下文。
  *
@@ -609,7 +610,7 @@ export function buildStateInjectionText(): string {
 
   // NPC 名册四档:在场发全量;同区域发名+身份+性格+所在地;不在场只发名+身份。NPC 越多省得越多。
   if (npcsOn) {
-    const npcBlock = fmtNpcContext(memory.npcs, memory.scenes, here, locPath, memory.state.time);
+    const npcBlock = fmtNpcContext(continuityOwnedNpcs(memory.npcs), memory.scenes, here, locPath, memory.state.time);
     if (npcBlock) st.push(`NPC名册:\n${npcBlock}`);
   }
 

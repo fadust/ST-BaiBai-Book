@@ -11,6 +11,7 @@
 
 import type { VectorEndpoint } from '@/api/settings';
 import { resolveVectorModel } from '@/api/settings';
+import { getContext } from '@/st/context';
 
 export class EmbedError extends Error {}
 
@@ -137,7 +138,9 @@ function buildEmbeddingRequest(ep: VectorEndpoint, model: string, texts: string[
       body: JSON.stringify({ model, input: texts }),
       parse: (json) => {
         if (!json?.data || !Array.isArray(json.data)) throw new EmbedError('embedding 返回缺少 data 数组');
-        return json.data.slice().sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
+        const rows = json.data.slice().sort((a: any, b: any) => a.index - b.index);
+        if (rows.some((row: any, i: number) => row.index !== i)) throw new EmbedError('Embedding response has missing or duplicate input indexes.');
+        return rows.map((d: any) => d.embedding);
       },
     };
   }
@@ -167,7 +170,15 @@ const EMBED_BATCH = 64;
 
 /** 发一批(≤EMBED_BATCH)文本的 embedding 请求,返回向量数组(顺序对应)。 */
 async function embedBatch(ep: VectorEndpoint, model: string, texts: string[], signal?: AbortSignal): Promise<Float32Array[]> {
-  const req = buildEmbeddingRequest(ep, model, texts);
+  if (ep.useHostProxy && isGeminiEndpoint(ep.url, model)) throw new EmbedError('Host embedding proxy requires an OpenAI-compatible endpoint.');
+  const host = getContext();
+  if (ep.useHostProxy && !host) throw new EmbedError('SillyTavern context unavailable for host embedding requests.');
+  const req: EmbeddingRequest = ep.useHostProxy ? {
+    endpoint: '/api/plugins/similharity/batch-embeddings',
+    headers: host!.getRequestHeaders(),
+    body: JSON.stringify({ source: 'vllm', apiUrl: embeddingBase(ep.url), apiKey: ep.key, model, texts }),
+    parse: json => json?.embeddings,
+  } : buildEmbeddingRequest(ep, model, texts);
   const resp = await fetchWithTimeoutRetry(
     req.endpoint,
     { method: 'POST', headers: req.headers, body: req.body },
@@ -175,11 +186,12 @@ async function embedBatch(ep: VectorEndpoint, model: string, texts: string[], si
   );
   if (!resp.ok) {
     const t = await resp.text().catch(() => '');
+    if (ep.useHostProxy && resp.status === 404) throw new EmbedError('Host embedding proxy unavailable: enable the installed Similharity server plugin or select direct requests.');
     throw new EmbedError(`embedding API ${resp.status}: ${t.slice(0, 200)}`);
   }
   const json = await resp.json();
   const vectors = req.parse(json);
-  if (!Array.isArray(vectors) || vectors.some((v) => !Array.isArray(v))) {
+  if (!Array.isArray(vectors) || vectors.length !== texts.length || vectors.some((v) => !Array.isArray(v) || !v.length || v.length !== vectors[0]?.length || !v.every(Number.isFinite) || !v.some(n => n !== 0))) {
     throw new EmbedError('embedding 返回的向量数据无效');
   }
   return vectors.map((v) => Float32Array.from(v));

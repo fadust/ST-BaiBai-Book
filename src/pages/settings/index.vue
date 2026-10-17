@@ -1213,6 +1213,10 @@ function exportPublicApiDocument() {
           <div class="bbs-vec-ep-outer">
             <div class="bbs-vec-ep-inner">
           <div class="bbs-vec-ep-body">
+          <label v-if="role.key === 'embedding'" class="bbs-field-hint">
+            <input type="checkbox" v-model="apiSettings.vector.embedding.useHostProxy" />
+            Send embeddings through SillyTavern (requires the Similharity server plugin; keeps this endpoint and model).
+          </label>
           <p v-if="role.key !== 'embedding'" class="bbs-field-hint">地址 / 密钥留空即复用 Embedding;模型仍需各自填写。</p>
 
           <label class="bbs-modal-field">

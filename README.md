@@ -17,3 +17,9 @@ The upstream GitHub URL supplies the Chinese original. Installation, compatibili
 Start with the main API, or configure auxiliary channels in Settings. Vector recall is optional and requires embedding and query-rewrite configuration; reranking is optional. Your existing settings and memory remain attached to the same SillyTavern account and chats.
 
 Original project and authorship: [baibai-git/ST-BaiBai-Book](https://github.com/baibai-git/ST-BaiBai-Book). [Original Chinese README](README.zh-CN.md) and the upstream API reference are retained in the package.
+
+### Local embedding reliability (maintained fork)
+
+Embedding settings offer an optional **Send embeddings through SillyTavern** switch for OpenAI-compatible endpoints. It uses the existing Similharity server plugin, the configured URL/model/key, and host CSRF headers. Direct requests remain the default; they require the embedding server to permit browser CORS. A missing proxy fails explicitly rather than switching providers. When enabled, enter the model name manually if the model-list endpoint does not allow browser CORS.
+
+Index failures are reported to manual rebuild and recall instead of being presented as an up-to-date index. Recall clears its temporary slot on failure; existing summaries remain available. Background indexing still fails safely. Malformed or incomplete embedding batches are rejected before storage.

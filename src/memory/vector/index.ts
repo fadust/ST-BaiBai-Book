@@ -7,7 +7,7 @@
  *  3. 摘要变化才重新 embed+upsert；仅全文/时间变化走轻量 payload 更新。
  * 同文本(同 hash)不重复 embed —— 这是「边玩边索引」不卡的关键。
  *
- * 调用时机:叶子生成/编辑/删除后(防抖触发,见 schedule)。全程 try/catch 静默,
+ * Background scheduling catches failures; awaited recall/manual rebuild receives them.
  * 向量是增强项,失败绝不影响摘要主流程。
  */
 
@@ -141,41 +141,37 @@ export async function syncVectorIndex(signal?: AbortSignal): Promise<VectorSyncR
 
   const run = async (): Promise<VectorSyncResult> => {
     const total: VectorSyncResult = { embedded: 0, payloadUpdated: 0 };
-    try {
-      let passRevision: number;
-      do {
-        passRevision = mutationRevision;
-        if (currentVectorDb() !== database || currentChatId() !== chatId) break;
-        const leaves = collectLeaves(getContext()?.chat ?? []);
-        const present = leaves.map(l => ({
-          leafId: l.leafId,
-          docHash: l.docHash,
-          payloadHash: l.payloadHash,
-        }));
+    let passRevision: number;
+    do {
+      passRevision = mutationRevision;
+      if (currentVectorDb() !== database || currentChatId() !== chatId) break;
+      const leaves = collectLeaves(getContext()?.chat ?? []);
+      const present = leaves.map(l => ({
+        leafId: l.leafId,
+        docHash: l.docHash,
+        payloadHash: l.payloadHash,
+      }));
 
-        // 摘要变化走 embed+upsert；仅全文/时间变化走轻量 payload 更新。
-        const { deleted = 0, missing, stalePayload = [] } = await vecReconcile(database, scope, present);
-        // 后端对账删掉了陈旧条目（如用户经 ST 原生删楼、叶子随之消失）→ 召回依赖的内容已变，
-        // 立即失效缓存，避免后续复用含已删记忆的旧注入。
-        if (deleted > 0) invalidateRecallCache();
-        const missingSet = new Set(missing);
-        const staleSet = new Set(stalePayload);
-        total.embedded += await embedAndUpsert(
-          database,
-          scope,
-          leaves.filter(l => missingSet.has(l.leafId)),
-          signal,
-        );
-        total.payloadUpdated += await updatePayload(
-          database,
-          scope,
-          leaves.filter(l => staleSet.has(l.leafId)),
-        );
-        // 索引运行期间又发生编辑时，再扫一轮，避免 single-flight 吞掉新变化。
-      } while (passRevision !== mutationRevision);
-    } catch (e) {
-      console.warn('[柏宝书向量] 索引同步失败(不影响摘要):', e);
-    }
+      // 摘要变化走 embed+upsert；仅全文/时间变化走轻量 payload 更新。
+      const { deleted = 0, missing, stalePayload = [] } = await vecReconcile(database, scope, present);
+      // 后端对账删掉了陈旧条目（如用户经 ST 原生删楼、叶子随之消失）→ 召回依赖的内容已变，
+      // 立即失效缓存，避免后续复用含已删记忆的旧注入。
+      if (deleted > 0) invalidateRecallCache();
+      const missingSet = new Set(missing);
+      const staleSet = new Set(stalePayload);
+      total.embedded += await embedAndUpsert(
+        database,
+        scope,
+        leaves.filter(l => missingSet.has(l.leafId)),
+        signal,
+      );
+      total.payloadUpdated += await updatePayload(
+        database,
+        scope,
+        leaves.filter(l => staleSet.has(l.leafId)),
+      );
+      // 索引运行期间又发生编辑时，再扫一轮，避免 single-flight 吞掉新变化。
+    } while (passRevision !== mutationRevision);
     return total;
   };
 
@@ -262,6 +258,6 @@ export function scheduleVectorIndex(): void {
   }
   timer = setTimeout(() => {
     timer = null;
-    void syncVectorIndex();
+    void syncVectorIndex().catch(e => console.warn('[BaiBai Book Vector] Index synchronization failed (summaries preserved):', e));
   }, 2500);
 }

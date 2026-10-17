@@ -67,6 +67,8 @@ export interface CustomPrompts {
  * embedding 为基准必填;rerank/queryRewrite 的 url 留空 = 整体复用 embedding 的端点与模型。
  */
 export interface VectorEndpoint {
+  /** Route OpenAI-compatible embeddings through the installed Similharity server plugin. */
+  useHostProxy?: boolean;
   /** OpenAI 兼容 base url(如 https://api.openai.com/v1);rerank/query 留空=复用 embedding */
   url: string;
   /** API 密钥 */
@@ -526,6 +528,7 @@ function normalizeVectorEndpoint(
 ): VectorEndpoint {
   const o = e ?? {};
   return {
+    useHostProxy: o.useHostProxy === true,
     url: typeof o.url === 'string' ? o.url : '',
     key: typeof o.key === 'string' ? o.key : '',
     model: typeof o.model === 'string' ? o.model : '',

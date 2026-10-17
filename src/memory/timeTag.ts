@@ -306,7 +306,8 @@ export function clampToTimeTags(mes: string): string {
   for (let m = startRe.exec(s); m; m = startRe.exec(s)) lastStart = m.index;
   if (lastStart >= 0) s = s.slice(lastStart);
   // 第一个 </bbs_end>(在已裁过前缀的串里找)
-  const endMatch = s.match(new RegExp(`</${END_TAG}>`, 'i'));
+  // Only a complete end tag is a boundary; a mistyped start closer must not discard the story.
+  const endMatch = s.match(new RegExp(`<${END_TAG}\\b[^>]*>[^<]*</${END_TAG}>`, 'i'));
   if (endMatch && endMatch.index !== undefined) {
     s = s.slice(0, endMatch.index + endMatch[0].length);
   }

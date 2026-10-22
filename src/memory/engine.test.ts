@@ -36,6 +36,39 @@ const summary = {
   timeEnd: '2026/9/7 10:05',
 };
 
+describe('Codex presence source provenance', () => {
+  it('binds fresh scene updates to text, swipe, branch and chat without changing memory validity', async () => {
+    const { getFloor } = await import('@/public/query');
+    const { leafValid } = await import('./apply');
+    const chat = [message(true), message()];
+    useChat(chat);
+    vi.mocked(client.requestViaMainApi).mockResolvedValue(JSON.stringify({ ...summary,
+      sceneFocus: { situation: 'Ari waits.', participants: ['Ari Vale'] } }));
+    await summarizeFloor(1);
+    expect(getFloor(1).memory.presenceSourceValid).toBe(true);
+    const original = chat[1].mes;
+    chat[1].mes += ' Ari leaves.';
+    expect(leafValid(chat[1])).toBe(true);
+    expect(getFloor(1).memory.presenceSourceValid).toBe(false);
+    chat[1].mes = original;
+    chat[1].swipe_id = 1;
+    expect(getFloor(1).memory.presenceSourceValid).toBe(false);
+    chat[1].swipe_id = 0;
+    chat[0].mes += ' Different branch.';
+    expect(getFloor(1).memory.presenceSourceValid).toBe(false);
+    chat[0].mes = 'Start the story.';
+    expect(getFloor(1).memory.presenceSourceValid).toBe(true);
+    vi.mocked(context.getContext).mockReturnValue({ ...context.getContext()!, getCurrentChatId: () => 'other' });
+    expect(getFloor(1).memory.presenceSourceValid).toBe(false);
+  });
+  it('legacy summaries have no presence authority', async () => {
+    const { getFloor } = await import('@/public/query');
+    useChat([message(false, { extra: { bbs_leaf: leaf() } })]);
+    expect(getFloor(0).memory.valid).toBe(true);
+    expect(getFloor(0).memory.presenceSourceValid).toBe(false);
+  });
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
   Object.assign(memory, createEmptyMemory());

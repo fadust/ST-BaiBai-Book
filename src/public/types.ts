@@ -118,6 +118,8 @@ export interface PublicFloor {
   body: string;
   memory: {
     stored: boolean;
+    /** Fresh same-branch source, separate from ordinary summary validity. */
+    presenceSourceValid: boolean;
     valid: boolean;
     id: string | null;
     summary: string | null;

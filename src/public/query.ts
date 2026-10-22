@@ -1,3 +1,4 @@
+import { presenceSource } from '@/memory/presenceSource';
 import { deriveMemory, getLeaf, leafValid } from '@/memory/apply';
 import { isRealAiReply, pendingAiFloors } from '@/memory/engine';
 import {
@@ -290,6 +291,7 @@ export function getFloor(floor: number): PublicFloor {
     body: cleanBody(typeof message.mes === 'string' ? message.mes : ''),
     memory: {
       stored: !!leaf,
+      presenceSourceValid: valid && !leaf?.seed && !!leaf?.presenceSource && leaf.presenceSource === presenceSource(chat, index, info.id, info.groupId),
       valid,
       id: valid ? leaf!.id : null,
       summary: valid ? leaf!.text : null,

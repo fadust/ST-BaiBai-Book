@@ -10,6 +10,7 @@ import { extractJsonObject } from './json';
 import { fmtConditionFragments } from './conditionPatch';
 import { clearInjection, refreshInjection, renderHistoryNodes, selectHistoryNodesBefore } from './inject';
 import { buildBatchSummaryPrompt, buildBatchThinking, buildCharCardSystem, buildPersonaSystem, buildResummaryPrompt, buildSummaryPrompt, buildSummaryThinking, buildWorldInfoSystem, fmtItemLogInline, isBuiltinSummaryPrompt, JAILBREAK_PROMPT, RESUMMARY_THINKING_CHECKLIST, selectRecentResolvedPlans } from './prompts';
+import { presenceSource } from './presenceSource';
 import { clampToTimeTags, cleanBody, parseTimeRange, syncTimeTagRegex, writeItemLogTag, writeVarLogTag } from './timeTag';
 import { renderSourceHints, type SourceExcerpt } from './sourceHints';
 import { memory, recomputeDerived, scheduleLeafFlush } from './store';
@@ -1073,6 +1074,7 @@ function applyLeafForFloor(
   stateBefore: ReturnType<typeof deriveMemory>,
   replaceLeaf?: LeafExtra,
   evidenceGuard?: LocationEvidenceGuard,
+  presenceSourceAtRequest?: string,
 ): void {
   if (!chat[aiFloor]) {
     throw new Error(`摘要落叶失败:楼层 #${aiFloor} 已不存在(可能在请求期间被删除)`);
@@ -1098,6 +1100,7 @@ function applyLeafForFloor(
     id: replaceLeaf?.id ?? makeLeafId(),
     text: llmString(delta.summary),
     delta: storedDelta,
+    presenceSource: presenceSourceAtRequest || undefined,
     timeStart,
     timeEnd,
     createdAt: replaceLeaf?.createdAt ?? Date.now(),
@@ -1139,6 +1142,7 @@ async function summarizeFloorWork(
     throw new Error(`摘要失败:楼层 #${aiFloor} 已不存在(可能在请求期间被删除)`);
   }
 
+  const source = presenceSource(chat, aiFloor, ctx.getCurrentChatId?.() ?? null, ctx.groupId == null ? null : String(ctx.groupId));
   const covered = options.replaceLeaf ? coveredBeforeFloor(chat, aiFloor) : coveredSet(chat);
   const targets = floorTargets(chat, aiFloor, covered);
   const content = renderMessages(chat, targets, ctx.name1, ctx.name2);
@@ -1206,7 +1210,7 @@ async function summarizeFloorWork(
     return { ...d, summary } as SummaryDelta & { summary: string };
   });
 
-  applyLeafForFloor(chat, aiFloor, delta, stateBefore, options.replaceLeaf, { content, enforce: isBuiltinSummaryPrompt() });
+  applyLeafForFloor(chat, aiFloor, delta, stateBefore, options.replaceLeaf, { content, enforce: isBuiltinSummaryPrompt() }, source);
   engineState.lastRunAt = Date.now();
 
   // 立刻反映到派生与注入;落盘走防抖(隐藏由收尾的 syncWindowHiddenState 统一负责)

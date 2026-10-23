@@ -73,3 +73,4 @@ Automated checks cover translation coverage, TS/Vue syntax, identifier and schem
 # Latest stable scene before generation
 
 With automatic summaries enabled, the generation interceptor waits for the latest completed assistant reply's summary and refreshed memory injection. Previously it could release generation as soon as that summary started, leaving the next story prompt with an older scene. Regenerate/swipe still skip the reply being rewritten; quiet, continue and impersonation keep their existing behavior. Retention, saved schemas and Codex actor ownership are unchanged.
+Turn Queue can call the same guard through `bbs_prepareTurn` before TunnelVision assembles canon prompts. The normal BaiBai interceptor remains the fallback and performs recall in its usual host stage; preparation does not start another writer.

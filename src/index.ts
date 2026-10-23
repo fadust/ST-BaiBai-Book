@@ -23,6 +23,9 @@ import { createApp } from 'vue';
 
 const HOST_ID = 'bbs-app-host';
 
+// Turn Queue runs this before canon prompt assembly; the normal interceptor remains the fallback.
+(globalThis as Record<string, unknown>).bbs_prepareTurn = handleGenerationIntercept;
+
 /**
  * 生成拦截器:ST 在每次生成前会 await 调用 manifest.generate_interceptor 指名的全局函数,
  * 签名 (chat, contextSize, abort, type),调 abort(true) 即中止本次生成。

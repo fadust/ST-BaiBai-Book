@@ -70,3 +70,6 @@ The generated source map points at upstream source; build-time translation edits
 ## Verification limits
 
 Automated checks cover translation coverage, TS/Vue syntax, identifier and schema-key stability, macro names, prompt structure, explicit English output rules, Unicode data, bilingual annotation readers, and timeline display. Live installation and UI checks are recorded in localization/LIVE-TEST.md. Model output quality and layout on every mobile theme require separate checks.
+# Latest stable scene before generation
+
+With automatic summaries enabled, the generation interceptor waits for the latest completed assistant reply's summary and refreshed memory injection. Previously it could release generation as soon as that summary started, leaving the next story prompt with an older scene. Regenerate/swipe still skip the reply being rewritten; quiet, continue and impersonation keep their existing behavior. Retention, saved schemas and Codex actor ownership are unchanged.

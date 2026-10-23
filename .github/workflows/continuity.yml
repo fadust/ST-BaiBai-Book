@@ -1,0 +1,24 @@
+name: Continuity integration
+
+on:
+  push:
+    branches: [codex/baibai-presence-bridge]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts --package-lock=false
+      - run: npm test
+      - run: npm run test:english
+      - run: npm run build

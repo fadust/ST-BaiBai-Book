@@ -4,7 +4,8 @@ import * as settings from '@/api/settings';
 import * as context from '@/st/context';
 import type { STContext, STMessage } from '@/st/context';
 import * as notices from '@/st/toast';
-import { batchBackfill, checkResummary, currentSummaryPromise, handleGenerationIntercept, openingPendingFloor, planBatches, summarizeFloor, summarizeSelected } from './engine';
+import { batchBackfill, checkResummary, currentSummaryPromise, handleGenerationIntercept, maybeSummarizePrevAi, openingPendingFloor, planBatches, summarizeFloor, summarizeSelected } from './engine';
+import { buildInjectionText } from './inject';
 import { buildBatchThinking, buildResummaryPrompt, buildSummaryThinking, RESUMMARY_THINKING_CHECKLIST, SUMMARY_OUTPUT_PROTOCOL } from './prompts';
 
 /** 新提示词的成文顺序段落标记(替代旧 RULE_SUMMARY_COMPOSITION 常量)。 */
@@ -122,6 +123,23 @@ describe('openingPendingFloor', () => {
 });
 
 describe('opening generation interception', () => {
+  it.each([false, true])('waits for the latest scene snapshot before releasing generation (already running=%s)', async alreadyRunning => {
+    const chat = [message(true), message(), message(true)];
+    useChat(chat);
+    let release!: (value: string) => void;
+    vi.mocked(client.requestViaMainApi).mockReturnValue(new Promise(resolve => { release = resolve; }));
+    const background = alreadyRunning ? maybeSummarizePrevAi(false) : Promise.resolve();
+    let released = false;
+    const intercepted = handleGenerationIntercept('normal', vi.fn()).then(value => { released = true; return value; });
+    await vi.waitFor(() => expect(client.requestViaMainApi).toHaveBeenCalledOnce());
+    expect(released).toBe(false);
+    release(JSON.stringify({ ...summary, sceneFocus: { situation: 'Nami waits by the chart on deck.', participants: ['Nami'] } }));
+    await background;
+    expect(await intercepted).toBe(false);
+    expect(chat[1].extra?.bbs_leaf?.text).toBe(summary.summary);
+    expect(buildInjectionText()).toContain('Nami waits by the chart on deck.');
+    expect(client.requestViaMainApi).toHaveBeenCalledOnce();
+  });
   it.each([
     ['swipe', false],
     ['regenerate', false],

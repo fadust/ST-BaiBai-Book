@@ -532,7 +532,7 @@ export function openingPendingFloor(chat: STMessage[]): number {
  * 判据 = holesExceptLast(末尾 AI 之前的待摘楼层),按数量分流:
  *  - 0 个 → 放行。
  *  - 恰好 1 个 → 等待正在后台生成的摘要;若事件时序未启动它,拦截器自行补这一楼。
- *    完成后重判,洞填上则启动最新稳定楼摘要;确认摘要请求已发起后放行,否则拦截。
+ *    After filling the gap, finish the latest stable reply's summary before releasing generation.
  *  - >1 个 → 直接拦截,且不启动新的自动补摘;由用户自行选择逐楼补摘或批量补摘。
  * 拦截 = abort(true) + /sendas 插提示楼。
  *
@@ -582,9 +582,9 @@ export async function handleGenerationIntercept(
 
   let holes = holesExceptLast(chat);
   if (holes.length < 1) {
-    // 确保最新稳定 AI 楼已进入后台摘要;只有聊天末尾实际是 AI 时才跳过正在改写的末楼。
-    // 通常事件监听器已经启动了它,busy 守卫会自动去重;这里是时序兜底。
-    void maybeSummarizePrevAi(skipLastAi);
+    // Await the latest completed reply so prompt assembly sees its scene snapshot.
+    await currentSummaryPromise();
+    await maybeSummarizePrevAi(skipLastAi);
     return false;
   }
 
@@ -600,9 +600,8 @@ export async function handleGenerationIntercept(
     }
     holes = holesExceptLast(chat);
     if (holes.length < 1) {
-      // 摘要在真正发 API 前还要异步读取世界书等上下文。若直接放行,正文生成可能抢先开始,
-      // 导致最新稳定楼的摘要请求未能启动。这里只等请求实际发起,不等摘要完成。
-      await maybeSummarizePrevAi(skipLastAi, true);
+      // Finish the latest stable reply after filling the older gap.
+      await maybeSummarizePrevAi(skipLastAi);
       return false;
     }
   }

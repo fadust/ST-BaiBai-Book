@@ -2,7 +2,7 @@ name: Continuity integration
 
 on:
   push:
-    branches: [codex/baibai-presence-bridge]
+    branches: [main, codex/baibai-presence-bridge, codex/english-1.3.5]
   pull_request:
   workflow_dispatch:
 

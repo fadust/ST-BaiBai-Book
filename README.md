@@ -23,3 +23,5 @@ Original project and authorship: [baibai-git/ST-BaiBai-Book](https://github.com/
 Embedding settings offer an optional **Send embeddings through SillyTavern** switch for OpenAI-compatible endpoints. It uses the existing Similharity server plugin, the configured URL/model/key, and host CSRF headers. Direct requests remain the default; they require the embedding server to permit browser CORS. A missing proxy fails explicitly rather than switching providers. When enabled, enter the model name manually if the model-list endpoint does not allow browser CORS.
 
 Index failures are reported to manual rebuild and recall instead of being presented as an up-to-date index. Recall clears its temporary slot on failure; existing summaries remain available. Background indexing still fails safely. Malformed or incomplete embedding batches are rejected before storage.
+
+English 1.3.5 merges upstream condition, location and prompt fixes and adds per-character knowledge lists. Custom NPC Codex ownership, presence provenance, scene preparation, and embedding reliability changes are retained.

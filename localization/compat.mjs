@@ -71,8 +71,7 @@ export const patches = {
     ['const RESUMMARY_BODY = afterStandaloneCore(resummaryRaw);', 'const RESUMMARY_BODY = RULE_ENGLISH_OUTPUT + "\\n\\n" + afterStandaloneCore(resummaryRaw);'],
     ['const RESUMMARY2_BODY = afterStandaloneCore(resummary2Raw);', 'const RESUMMARY2_BODY = RULE_ENGLISH_OUTPUT + "\\n\\n" + afterStandaloneCore(resummary2Raw);'],
     ['const BATCH_SUMMARY_RULES = `', 'const BATCH_SUMMARY_RULES = RULE_ENGLISH_OUTPUT + "\\n\\n" + `'],
-    ['const supplements = [PROTAGONIST_PROTOCOL_SUPPLEMENT,', 'const supplements = [RULE_ENGLISH_OUTPUT, PROTAGONIST_PROTOCOL_SUPPLEMENT,'],
-    ['const supplements = [RULE_ABSOLUTE_TIME_LANGUAGE];', 'const supplements = [RULE_ENGLISH_OUTPUT, RULE_ABSOLUTE_TIME_LANGUAGE];'],
+    ['const supplements: string[] = [];', 'const supplements: string[] = [RULE_ENGLISH_OUTPUT];'],
     ["export const THINKING_CHECKLIST = protocolSection('THINKING_CHECKLIST');", "export const THINKING_CHECKLIST = protocolSection('THINKING_CHECKLIST') + '\\n\\n' + RULE_ENGLISH_OUTPUT;"],
     ["export const RESUMMARY_THINKING_CHECKLIST = protocolSection('RESUMMARY_THINKING_CHECKLIST');", "export const RESUMMARY_THINKING_CHECKLIST = protocolSection('RESUMMARY_THINKING_CHECKLIST') + '\\n\\n' + RULE_ENGLISH_OUTPUT;"],
     ['export const BATCH_THINKING_CHECKLIST = `', 'export const BATCH_THINKING_CHECKLIST = RULE_ENGLISH_OUTPUT + "\\n\\n" + `'],
@@ -105,7 +104,8 @@ export function finishCompatibility(source, filename) {
   if (filename.replaceAll('\\', '/').endsWith('/memory/prompts.ts')) {
     const legacy = name => {
       const text = fs.readFileSync(new URL(`../src/memory/prompts/${name}.txt`, import.meta.url), 'utf8');
-      return text.slice(text.indexOf('</nvwa_standalone_core>') + '</nvwa_standalone_core>'.length).trim();
+      const i = text.indexOf('</nvwa_standalone_core>');
+      return (i >= 0 ? text.slice(i + '</nvwa_standalone_core>'.length) : text).trim();
     };
     const tasks = fs.readFileSync(new URL('../src/memory/prompts/tasks.txt', import.meta.url), 'utf8');
     const protocols = fs.readFileSync(new URL('../src/memory/prompts/builtin-protocols.txt', import.meta.url), 'utf8');
@@ -124,9 +124,10 @@ export function finishCompatibility(source, filename) {
       }
     }
     if (!values.TIME_TAG_PROMPT) throw new Error('Legacy time-tag default needs review');
+    const previous = JSON.parse(fs.readFileSync(new URL('./legacy-prompts-1.3.2.json', import.meta.url), 'utf8'));
     const originals = { summary: legacy('summary'), resummary: legacy('resummary'), resummary2: legacy('resummary2'), jailbreak: tasks.slice(0, tasks.indexOf('</nvwa_standalone_core>') + '</nvwa_standalone_core>'.length).trim(), timeTag: values.TIME_TAG_PROMPT };
-    source += `\nconst LEGACY_PROMPTS = ${JSON.stringify(originals)};\n`;
-    source += '\nexport function isLegacyBuiltinPrompt(key: string, value: string): boolean {\n  return key in LEGACY_PROMPTS && value.trim().replace(/\\r\\n/g, "\\n") === LEGACY_PROMPTS[key as keyof typeof LEGACY_PROMPTS].trim().replace(/\\r\\n/g, "\\n");\n}\n';
+    source += `\nconst LEGACY_PROMPTS = ${JSON.stringify(Object.fromEntries(Object.entries(originals).map(([key, value]) => [key, [value, previous[key]].filter(Boolean)])))};\n`;
+    source += '\nexport function isLegacyBuiltinPrompt(key: string, value: string): boolean {\n  return key in LEGACY_PROMPTS && LEGACY_PROMPTS[key as keyof typeof LEGACY_PROMPTS].some(original => value.trim().replace(/\\r\\n/g, "\\n") === original.trim().replace(/\\r\\n/g, "\\n"));\n}\n';
     source = source.replaceAll('const custom = apiSettings.prompts.summary.trim();', 'const saved = apiSettings.prompts.summary.trim();\n  const custom = isLegacyBuiltinPrompt("summary", saved) ? "" : saved;');
     source = source.replace('custom !== builtin.trim()', 'custom !== builtin.trim() && !isLegacyBuiltinPrompt(isSecond ? "resummary2" : "resummary", custom)');
   }

@@ -1,8 +1,8 @@
 # BaiBai Book: English localization
 
-Based on upstream 1.3.2, commit `21f7488d8083f6293c3d4db654216f49fc35ea85`.
+Based on upstream 1.3.5, commit `0a3a1cdfe92bf5ff1b822b6b6588cb694090d0da`.
 
-Version 1.3.2 includes upstream fixes for manually replacing or clearing protagonist conditions and clearing NPC conditions or outfits. The English interface, prompts, compatibility readers, and layout overrides are retained.
+Version 1.3.5 includes full-condition replacement and legacy replay fixes, per-character knowledge lists, server-proxied query rewriting, shared prompt rules, more reliable NPC locations, optional location descriptions, and clearable NPC fields. The English interface, prompts, compatibility readers, and layout overrides are retained. All seven custom commits through e6272fa are preserved, including NPC Codex actor ownership, source-bound scene presence, scene preparation/Turn Queue, timestamp handling, and embedding reliability.
 
 ## Install the built extension
 
@@ -35,7 +35,7 @@ There is no saved-chat translation or schema migration. Existing `baibai_book` s
 
 Item and variable annotations accept both their legacy Chinese verbs and the English verbs. Newly generated annotations use English. Chinese date and age readers remain available; the age reader also accepts English forms such as `20 years old` and `about 20`.
 
-An exact saved copy of any of the five upstream default templates is recognized without changing the stored text, including Windows line endings. Runtime requests and the prompt editor use the English built-in version. Customized templates, summaries, notes, variable meanings, lorebooks, character cards, and past chats remain as written; use **Restore default** in the prompt editor if you want to replace a customized Chinese template.
+An exact saved copy of any of the five current upstream default templates, or the previous 1.3.2 summary/compression defaults, is recognized without changing the stored text, including Windows line endings. Runtime requests and the prompt editor use the English built-in version. Customized templates, summaries, notes, variable meanings, lorebooks, character cards, and past chats remain as written; use **Restore default** in the prompt editor if you want to replace a customized Chinese template.
 
 ## Build and verify
 
@@ -50,11 +50,11 @@ npm run build
 
 The resulting `dist/index.js`, `dist/index.css`, and source map are ready to copy to the extension directory. No translation service or localization network request runs in the extension. The original runtime dependencies are unchanged.
 
-The upstream type check currently reports missing Node type declarations in its Vite config. Upstream 1.3.2 fixes the previous `conditionPatch` label type error in `FloorPanel.vue`. The English source check validates all transformed TS/Vue syntax; the remaining existing type errors are documented rather than changed as part of localization.
+The upstream type check currently reports missing Node type declarations in its Vite config. Upstream 1.3.5 retires new `conditionPatch` output while retaining legacy replay. The English source check validates all transformed TS/Vue syntax; the remaining existing type errors are documented rather than changed as part of localization.
 
 ## Merge future upstream updates
 
-All translation data and compatibility logic live in `localization/`. `vite.english.config.mjs` applies them at build time. Upstream `src/` files have no content changes. Integration edits are limited to build/watch scripts, the display name, ignore entries, and a prompt-file line-ending rule for Windows checkouts.
+All translation data and compatibility logic live in `localization/`. `vite.english.config.mjs` applies them at build time. Translation remains a build-time layer. Custom continuity integration changes also exist in `src/`; preserve the commits listed above when merging.
 
 1. Merge the next upstream commit using Git, preserving `localization/`, the English Vite config, and the English build commands.
 2. Run `npm install --ignore-scripts --package-lock=false` if upstream dependencies changed.

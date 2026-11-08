@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiSettings } from '@/api/settings';
 import {
   SUMMARY_PROMPT, RESUMMARY_PROMPT, RESUMMARY2_PROMPT, SUMMARY_MACROS,
-  SUMMARY_OUTPUT_PROTOCOL, CONDITION_PATCH_PROTOCOL, QUERY_REWRITE_SYSTEM, QUERY_REWRITE_TAIL,
+  SUMMARY_OUTPUT_PROTOCOL, QUERY_REWRITE_SYSTEM, QUERY_REWRITE_TAIL,
   buildSummaryPrompt, buildSummaryThinking, buildBatchSummaryPrompt, buildBatchThinking,
   buildResummaryPrompt, buildPersonaSystem, buildWorldInfoSystem, buildCharCardSystem,
   fmtItemLogInline, isBuiltinSummaryPrompt, isLegacyBuiltinPrompt,
   RULE_ENGLISH_OUTPUT, RESUMMARY_THINKING_CHECKLIST,
+  RULE_PROTAGONIST, RULE_NPC_AFFINITY, RULE_SCENE_FOCUS, RULE_RELATION_MOMENTUM, RULE_ABSOLUTE_TIME_LANGUAGE,
 } from '@/memory/prompts';
 import { parseItemLogText, fmtVarOpsInline, finalizeVarOps } from '@/memory/apply';
 import { weekdayLabel, relativeTimeLabel, ageDisplay } from '@/memory/timeRel';
@@ -26,6 +27,35 @@ const args = {
 };
 
 describe('English prompts and schema contracts', () => {
+  it('keeps saved 1.3.2 defaults on the current English built-ins', () => {
+    const previous = JSON.parse(fs.readFileSync('localization/legacy-prompts-1.3.2.json', 'utf8'));
+    for (const key of ['summary', 'resummary', 'resummary2'] as const) {
+      expect(isLegacyBuiltinPrompt(key, previous[key])).toBe(true);
+      expect(isLegacyBuiltinPrompt(key, previous[key] + '\nCUSTOM RULE')).toBe(false);
+    }
+    apiSettings.prompts.summary = previous.summary;
+    expect(isBuiltinSummaryPrompt()).toBe(true);
+    expect(buildSummaryPrompt(args).system).not.toMatch(/\p{Script=Han}/u);
+    expect(apiSettings.prompts.summary).toBe(previous.summary);
+  });
+  it('localizes knowledge recording and injection without changing stored beliefs', async () => {
+    const { fmtKnowledgeInjection } = await import('@/memory/knowledge');
+    const knowledge = [{ id: 'known#0', subject: 'Bob', text: 'Believes Alice is a merchant.', createdAt: 1 }];
+    const parts = buildSummaryPrompt({ ...args, knowledge });
+    expect(parts.system).toContain('【Knowledge list rules】');
+    expect(parts.system).toContain('"knowledge":');
+    expect(parts.user).toContain('k1. Believes Alice is a merchant.');
+    const injection = fmtKnowledgeInjection(knowledge, ['Bob', 'Carol'], 'Alice');
+    expect(injection).toContain(knowledge[0].text);
+    expect(injection).toContain('Carol');
+    expect(parts.system + parts.user + injection).not.toMatch(/\p{Script=Han}|\{\{\w+\}\}/u);
+  });
+  it('extracts every shared rule from translated built-in headings', () => {
+    for (const rule of [RULE_PROTAGONIST, RULE_NPC_AFFINITY, RULE_SCENE_FOCUS, RULE_RELATION_MOMENTUM, RULE_ABSOLUTE_TIME_LANGUAGE]) {
+      expect(rule.length).toBeGreaterThan(100);
+      expect(rule).not.toMatch(/\p{Script=Han}/u);
+    }
+  });
   it('requires English output with Chinese source and custom templates on every summary path', () => {
     const input = { ...args, user: '小明', location: '学校', history: '旧摘要：小明回家。', content: '小明说明天回家。' };
     for (const custom of ['', '请用中文输出 {{content}}']) {
@@ -63,9 +93,9 @@ describe('English prompts and schema contracts', () => {
       expect(text).not.toMatch(/\{\{\w+\}\}/);
     }
     expect(parts.system).toContain('"summary":');
-    expect(parts.system).toContain('"stateChanges":');
-    expect(CONDITION_PATCH_PROTOCOL).toContain('"evidence":');
-    expect(CONDITION_PATCH_PROTOCOL).not.toContain('"evidence ":');
+    expect(parts.system).not.toContain('"stateChanges":');
+    expect(parts.system).not.toContain('"conditionPatch":');
+    expect(parts.system).toContain('"condition":');
   });
   it('preserves every prompt macro token', () => {
     expect(SUMMARY_MACROS.map(macro => macro.token)).toContain('{{summary_max_chars}}');

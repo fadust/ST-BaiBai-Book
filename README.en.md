@@ -17,3 +17,5 @@ The upstream GitHub URL supplies the Chinese original. Installation, compatibili
 Start with the main API, or configure auxiliary channels in Settings. Vector recall is optional and requires embedding and query-rewrite configuration; reranking is optional. Your existing settings and memory remain attached to the same SillyTavern account and chats.
 
 Original project and authorship: [baibai-git/ST-BaiBai-Book](https://github.com/baibai-git/ST-BaiBai-Book). [Original Chinese README](README.zh-CN.md) and the upstream API reference are retained in the package.
+
+English 1.3.5 merges upstream condition, location and prompt fixes and adds per-character knowledge lists. Custom NPC Codex ownership, presence provenance, scene preparation, and embedding reliability changes are retained.

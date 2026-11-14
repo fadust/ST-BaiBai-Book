@@ -4,8 +4,7 @@ import * as settings from '@/api/settings';
 import * as context from '@/st/context';
 import type { STContext, STMessage } from '@/st/context';
 import * as notices from '@/st/toast';
-import { batchBackfill, checkResummary, currentSummaryPromise, handleGenerationIntercept, maybeSummarizePrevAi, openingPendingFloor, planBatches, summarizeFloor, summarizeSelected } from './engine';
-import { buildInjectionText } from './inject';
+import { batchBackfill, bindEngine, checkResummary, currentSummaryPromise, handleGenerationIntercept, openingPendingFloor, planBatches, summarizeFloor, summarizeSelected } from './engine';
 import { buildBatchThinking, buildResummaryPrompt, buildSummaryThinking, RESUMMARY_THINKING_CHECKLIST, SUMMARY_OUTPUT_PROTOCOL } from './prompts';
 
 /** 新提示词的成文顺序段落标记(替代旧 RULE_SUMMARY_COMPOSITION 常量)。 */
@@ -88,12 +87,13 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-function useChat(chat: STMessage[]) {
+function useChat(chat: STMessage[], overrides: Partial<STContext> = {}) {
   vi.spyOn(context, 'getContext').mockReturnValue({
     chat,
     name1: 'User',
     name2: 'Character',
     getCurrentChatId: () => 'opening-regression',
+    ...overrides,
   } as STContext);
 }
 
@@ -123,23 +123,6 @@ describe('openingPendingFloor', () => {
 });
 
 describe('opening generation interception', () => {
-  it.each([false, true])('waits for the latest scene snapshot before releasing generation (already running=%s)', async alreadyRunning => {
-    const chat = [message(true), message(), message(true)];
-    useChat(chat);
-    let release!: (value: string) => void;
-    vi.mocked(client.requestViaMainApi).mockReturnValue(new Promise(resolve => { release = resolve; }));
-    const background = alreadyRunning ? maybeSummarizePrevAi(false) : Promise.resolve();
-    let released = false;
-    const intercepted = handleGenerationIntercept('normal', vi.fn()).then(value => { released = true; return value; });
-    await vi.waitFor(() => expect(client.requestViaMainApi).toHaveBeenCalledOnce());
-    expect(released).toBe(false);
-    release(JSON.stringify({ ...summary, sceneFocus: { situation: 'Nami waits by the chart on deck.', participants: ['Nami'] } }));
-    await background;
-    expect(await intercepted).toBe(false);
-    expect(chat[1].extra?.bbs_leaf?.text).toBe(summary.summary);
-    expect(buildInjectionText()).toContain('Nami waits by the chart on deck.');
-    expect(client.requestViaMainApi).toHaveBeenCalledOnce();
-  });
   it.each([
     ['swipe', false],
     ['regenerate', false],
@@ -198,17 +181,89 @@ describe('opening generation interception', () => {
     },
   );
 
-  it('summarizes the first generated reply normally after the next user message', async () => {
-    const chat = [message(true), message(), message(true)];
-    useChat(chat);
+});
 
-    await handleGenerationIntercept('normal', vi.fn());
+describe('automatic L0 summary timing', () => {
+  function bindEvents(chat: STMessage[], overrides: Partial<STContext> = {}) {
+    const handlers = new Map<string, (...args: any[]) => unknown>();
+    useChat(chat, {
+      eventTypes: {
+        USER_MESSAGE_RENDERED: 'user_message_rendered',
+        CHARACTER_MESSAGE_RENDERED: 'character_message_rendered',
+        GENERATION_STARTED: 'generation_started',
+      } as STContext['eventTypes'],
+      eventSource: { on: (name, handler) => { handlers.set(name, handler); } },
+      ...overrides,
+    });
+    bindEngine();
+    return (name: string, ...args: any[]) => handlers.get(name)?.(...args);
+  }
+
+  it('starts each summary after the next response renders and keeps generation moving while it runs', async () => {
+    const chat = [message(true), message()];
+    const emit = bindEvents(chat);
+    const request = vi.mocked(client.requestViaMainApi);
+    let release!: (value: string) => void;
+    request.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+    const abort = vi.fn();
+
+    emit('character_message_rendered', 1, 'normal');
+    chat.push(message(true));
+    emit('user_message_rendered', 2);
+    emit('generation_started', 'normal');
+    expect(await handleGenerationIntercept('normal', abort)).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+
+    chat.push(message(false, { mes: 'The next response.' }));
+    expect(emit('character_message_rendered', 3, 'normal')).toBeUndefined();
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(chat[1].extra?.bbs_leaf).toBeUndefined();
+    expect(chat[3].extra?.bbs_leaf).toBeUndefined();
+
+    chat.push(message(true));
+    emit('user_message_rendered', 4);
+    emit('generation_started', 'normal');
+    expect(await handleGenerationIntercept('normal', abort)).toBe(false);
+    chat.push(message(false, { mes: 'The third response.' }));
+    expect(emit('character_message_rendered', 5, 'normal')).toBeUndefined();
+    expect(request).toHaveBeenCalledOnce();
+    expect(abort).not.toHaveBeenCalled();
+
+    release(JSON.stringify(summary));
+    await vi.waitFor(() => expect(chat[3].extra?.bbs_leaf?.text).toBe(summary.summary));
+    expect(chat[1].extra?.bbs_leaf?.text).toBe(summary.summary);
+    expect(chat[5].extra?.bbs_leaf).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards a pending summary if its source reply is replaced', async () => {
+    const chat = [message(true), message(), message(true), message()];
+    const emit = bindEvents(chat);
+    const request = vi.mocked(client.requestViaMainApi);
+    let release!: (value: string) => void;
+    request.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+
+    emit('character_message_rendered', 3, 'normal');
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    chat[1] = message(false, { mes: 'Replacement reply.' });
+    release(JSON.stringify(summary));
     await currentSummaryPromise();
 
-    expect(notices.toast).not.toHaveBeenCalled();
-    expect(client.requestViaMainApi).toHaveBeenCalledOnce();
-    expect(chat[1].extra?.bbs_leaf?.text).toBe(summary.summary);
+    expect(chat[1].extra?.bbs_leaf).toBeUndefined();
   });
+
+  it.each(['first_message', 'command', 'continue', 'appendFinal', 'failed stream'])(
+    'leaves the previous reply pending after %s', type => {
+      const chat = [message(true), message(), message(true), message()];
+      const emit = bindEvents(chat, type === 'failed stream'
+        ? { streamingProcessor: { messageId: 3, isStopped: true } }
+        : {});
+      emit('character_message_rendered', 3, type === 'failed stream' ? 'normal' : type);
+
+      expect(currentSummaryPromise()).toBeNull();
+      expect(client.requestViaMainApi).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('summary request roles', () => {

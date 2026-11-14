@@ -4,6 +4,8 @@ This is a free-to-use English implementation of BaiBai Book. Credit and ownershi
 
 BaiBai Book is a SillyTavern memory extension. It summarizes chat messages, compresses older summaries, tracks characters, inventory, locations, plans, and custom variables, and supplies relevant memory to the main chat model.
 
+Automatic L0 summaries start in the background after the next AI reply appears. For example, Response #11 triggers the summary of Response #10, and Response #12 triggers the summary of Response #11.
+
 This edition localizes both the interface and the model-facing prompts. It preserves existing memory schemas and saved chats. The localization is applied during the build so the upstream source remains easy to merge.
 
 Install this English edition through SillyTavern's extension installer using:

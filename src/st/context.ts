@@ -70,6 +70,7 @@ export interface STContext {
   reloadCurrentChat: () => Promise<void>;
   eventSource: STEventSource;
   eventTypes: STEventTypes;
+  streamingProcessor?: { messageId: number; isStopped: boolean; abortController?: AbortController } | null;
   /** 注入扩展提示(key, value, position, depth, scan, role, filter)。ST 稳定 API。 */
   setExtensionPrompt?: (
     key: string,

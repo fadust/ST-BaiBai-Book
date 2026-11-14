@@ -528,22 +528,8 @@ export function openingPendingFloor(chat: STMessage[]): number {
 }
 
 /**
- * 生成拦截器:每次「产出新正文」的生成前,守住不变式「除最后一条 AI 外其余都必须有摘要」。
- * 判据 = holesExceptLast(末尾 AI 之前的待摘楼层),按数量分流:
- *  - 0 个 → 放行。
- *  - 恰好 1 个 → 等待正在后台生成的摘要;若事件时序未启动它,拦截器自行补这一楼。
- *    After filling the gap, finish the latest stable reply's summary before releasing generation.
- *  - >1 个 → 直接拦截,且不启动新的自动补摘;由用户自行选择逐楼补摘或批量补摘。
- * 拦截 = abort(true) + /sendas 插提示楼。
- *
- * 关键时序/口径(改前务必理解,否则极易复发并行 bug):
- *  1) type 口径必须与摘要触发(bindEngine 里 GENERATION_STARTED 监听器)一致——都放行
- *     continue/quiet/impersonate、都管 normal/regenerate/swipe。否则重生/翻页时「补摘」与「生成」会并行。
- *  2) GENERATION_STARTED(触发 maybeSummarizePrevAi)在 ST 中先于本拦截器 emit,且 maybeSummarizePrevAi
- *     到 runSummary 之间是同步代码、runSummary 同步置好 currentRun → 本拦截器跑时已能读到「在飞」信号。
- *  3) ST 会 await 本拦截器(script.js runGenerationInterceptors),故 await 能真正阻塞生成;
- *     且拦截器在 prompt 组装之前跑,摘要落盘后,后续组装阶段的注入自然带上新数据。
- * 跟随「自动摘要」开关:关了则一并不拦。
+ * 生成前保留开场白时间锚点和旧缺口恢复。
+ * 常规 L0 摘要在下一条 AI 回复落定后启动,后台处理中仍可继续生成。
  */
 export async function handleGenerationIntercept(
   type: string | undefined,
@@ -552,13 +538,13 @@ export async function handleGenerationIntercept(
   if (!engineActiveHere()) return false; // 排除角色/总开关关:不拦
   if (!apiSettings.autoSummaryEnabled) return false; // 自动摘要关 → 拦截一并关
   // 要产出新正文的生成才拦:normal(发消息)/regenerate(重新生成)/swipe(翻页)。
-  // 与摘要触发(GENERATION_STARTED 监听器)同口径,否则重生/翻页时「补摘」与「生成」会并行。
   // continue(续写)/quiet(安静)/impersonate(扮演)放行,不该被洞挡。
   if (type === 'continue' || type === 'quiet' || type === 'impersonate') return false;
 
   const ctx = getContext();
   if (!ctx) return false;
-  if (!ctx.getCurrentChatId?.()) return false; // 欢迎页:无聊天不拦
+  const chatId = ctx.getCurrentChatId?.();
+  if (!chatId) return false; // 欢迎页:无聊天不拦
   const chat = ctx.chat ?? [];
   normalizeBacklogNotices(chat); // 兼容升级前已存在但尚未标记的提示楼
   const skipLastAi = shouldSkipLastAiForGeneration(chat, type);
@@ -581,29 +567,17 @@ export async function handleGenerationIntercept(
   }
 
   let holes = holesExceptLast(chat);
-  if (holes.length < 1) {
-    // Await the latest completed reply so prompt assembly sees its scene snapshot.
-    await currentSummaryPromise();
-    await maybeSummarizePrevAi(skipLastAi);
-    return false;
-  }
+  if (holes.length === 0) return false;
+  // 本聊天的摘要仍在处理,其中也可能包含落叶后的压缩。
+  const runningFloor = floorBackfillState.floor;
+  if (floorBackfillState.chatId === chatId && runningFloor !== null && runningFloor <= holes[0]) return false;
 
-  // 恰好 1 个洞:优先等后台任务;若事件时序未启动且引擎空闲,拦截器自行补。
-  if (holes.length === 1) {
-    const inflight = currentSummaryPromise();
-    if (inflight) {
-      toast('正在补摘前一楼层,请稍候…', 'info');
-      await inflight;
-    } else if (!busy) {
-      toast('正在补摘前一楼层,请稍候…', 'info');
-      await runSummary(holes[0]);
-    }
+  // 恰好 1 个旧缺口:引擎空闲时尝试恢复,避免新摘要越过它。
+  if (holes.length === 1 && !busy) {
+    toast('正在补摘前一楼层,请稍候…', 'info');
+    await runSummary(holes[0]);
     holes = holesExceptLast(chat);
-    if (holes.length < 1) {
-      // Finish the latest stable reply after filling the older gap.
-      await maybeSummarizePrevAi(skipLastAi);
-      return false;
-    }
+    if (holes.length === 0) return false;
   }
 
   abort(true); // 仍有洞(>1,或那唯一的洞没在飞/补失败):立即中止
@@ -755,93 +729,30 @@ export async function setFloorOmit(floor: number, on: boolean): Promise<void> {
   scheduleLeafFlush();
 }
 
-/**
- * 自动触发的单楼摘要:**最早待摘优先**,一次最多处理一楼。
- * @param skipLastAi true 时跳过正在操作的末尾 AI 消息(翻页/重新生成场景),它不参与目标选取。
- * @param waitUntilRequestStarts true 时只等到摘要 API 请求实际发起,随后让摘要在后台完成。
- *
- * 不变式:除最后一条 AI 外,其余 AI 楼都应有摘要。为此目标取「可摘范围内最早的待摘 AI 楼」,
- * 而非「上一条」——否则前面有失败楼(洞)时,新楼会越过它先摘,导致倒序(计划漏删等)。
- *  - 发消息:可摘范围 = 直到最后一条 AI 楼。skipLastAi=false。
- *  - 翻页/重新生成:末尾 AI 正在被改写,排除它,范围 = 直到之前那条 AI。skipLastAi=true。
- * 若存在多个旧洞,不自动消耗额度:直接早退,交给拦截器提示用户选择逐楼或批量补摘。
- * 只有正常的最新楼、或唯一旧洞会自动处理。唯一旧洞补完后,拦截器会另启最新稳定楼的
- * 单次后台摘要,恢复「摘要与正文生成并行」的正常节奏。
- */
-export async function maybeSummarizePrevAi(
-  skipLastAi: boolean,
-  waitUntilRequestStarts = false,
-): Promise<void> {
+/** 新回复落定后，在后台补它之前唯一待摘的 AI 楼。 */
+async function maybeSummarizePrevAi(replyFloor: number): Promise<void> {
   const ctx = getContext();
-  const chat = ctx?.chat ?? [];
-  if (!engineActiveHere()) return;
-  if (!apiSettings.autoSummaryEnabled) return;
-  if (busy) return;
   if (!ctx) return;
-  if (chat.length === 0) return;
+  const chatId = ctx.getCurrentChatId?.();
+  const chat = ctx.chat;
+  const reply = chat[replyFloor];
+  if (!chatId || !isAiFloor(reply) || reply.mes.trim() === '...') return;
+  const stream = ctx.streamingProcessor;
+  if (stream?.messageId === replyFloor && (stream.isStopped || stream.abortController?.signal.aborted)) return;
+  if (!engineActiveHere() || !apiSettings.autoSummaryEnabled) return;
 
-  const holes = holesExceptLast(chat);
-  if (holes.length > 1) {
-    console.log('[柏宝书] 多个摘要缺口,停止自动补摘,交由用户手动处理:', holes);
-    return;
-  }
+  while (currentRun) await currentRun;
+  const active = getContext();
+  if (active?.getCurrentChatId?.() !== chatId || active.chat !== chat || chat[replyFloor] !== reply) return;
+  if (busy || !engineActiveHere() || !apiSettings.autoSummaryEnabled) return;
 
-  // 可摘范围上界:发消息=最后一条 AI;翻页/重生=之前那条 AI(末尾易变,排除)。
-  const ceiling = prevAiFloor(chat, skipLastAi);
-  if (ceiling < 0) return;
-
-  // 范围内最早的待摘 AI 楼(洞优先);没有则仅跑收尾(隐藏窗口可能变化)。
-  const pending = pendingAiFloors(chat);
-  const target = pending.find(f => f <= ceiling);
-  if (target === undefined) {
+  const pending = pendingAiFloors(chat).filter(floor => floor < replyFloor);
+  if (pending.length > 1) return; // 多个旧缺口仍由用户处理,避免跳摘。
+  if (pending.length === 1) await runSummary(pending[0]);
+  const current = getContext();
+  if (current?.getCurrentChatId?.() === chatId && current.chat === chat) {
     await afterSummaryHideAndInject(chat);
-    return;
   }
-
-  if (waitUntilRequestStarts) {
-    let markStarted: () => void = () => {};
-    const started = new Promise<'request-started'>(resolve => {
-      markStarted = () => resolve('request-started');
-    });
-    const run = runSummary(target, { onRequestStart: markStarted });
-    void run
-      .then(async () => {
-        await afterSummaryHideAndInject(chat);
-      })
-      .catch(e => {
-        engineState.lastError = e instanceof Error ? e.message : String(e);
-      });
-    // 早退/失败时 run 会先完成,不会因为启动屏障未触发而卡住正文生成。
-    await Promise.race([
-      started,
-      run.then(() => 'run-finished' as const),
-    ]);
-    return;
-  }
-
-  await runSummary(target);
-  await afterSummaryHideAndInject(chat);
-}
-
-/**
- * 找「上一条已定稿 AI 消息」的索引。
- * skipLastAi=false → 最后一条 AI 楼;skipLastAi=true → 跳过最后一条 AI 楼,取再之前那条。
- * 找不到返回 -1。
- */
-export function prevAiFloor(chat: STMessage[], skipLastAi: boolean): number {
-  let lastAi = -1;
-  for (let i = chat.length - 1; i >= 0; i--) {
-    if (isAiFloor(chat[i])) {
-      lastAi = i;
-      break;
-    }
-  }
-  if (lastAi < 0) return -1;
-  if (!skipLastAi) return lastAi;
-  for (let i = lastAi - 1; i >= 0; i--) {
-    if (isAiFloor(chat[i])) return i;
-  }
-  return -1;
 }
 
 /** 把递增的索引列表合并成连续区间(供 /hide 0-3 这种批量参数用) */
@@ -1003,7 +914,7 @@ async function sendAndParse<T>(
 
 /**
  * 单楼摘要。对外包一层,维护「当前在飞摘要」信号 currentRun,供生成拦截器 await(见 handleGenerationIntercept)。
- *  - currentRun 同步置为本次 promise → 拦截器在 GENERATION_STARTED(触发摘要)之后跑时已能读到它。
+ *  - currentRun 同步置为本次 promise,供下一次摘要等待。
  *  - finally 里清回 null(只清自己,避免清掉后一次调用设的新 promise)。
  *  - 真正的请求/落盘在 runSummaryInner;它内部已 try/catch,promise 永不 reject → 拦截器 await 不会卡死。
  * 注:早退(busy/非 AI 楼等)也会经历「置 p → 立即 finally 清回 null」,只是 p 几乎瞬间 resolve,不构成有效在飞。
@@ -1011,8 +922,6 @@ async function sendAndParse<T>(
 interface RunSummaryOptions {
   replaceLeaf?: LeafExtra;
   checkResummary?: boolean;
-  /** 内部启动屏障:摘要上下文准备完毕、即将调用 API 时触发。 */
-  onRequestStart?: () => void;
 }
 
 export function runSummary(aiFloor: number, options: RunSummaryOptions = {}): Promise<void> {
@@ -1128,22 +1037,25 @@ function applyLeafForFloor(
 
 /**
  * 单楼摘要的「纯工作」部分:发请求 + 解析 + 落叶 + 刷新派生/注入。
- * **不管理 busy / 不做守卫 / 不触发 checkResummary**——由调用方(runSummaryInner 或批量回退)负责。
+ * **不管理 busy / 不触发 checkResummary**——由调用方(runSummaryInner 或批量回退)负责。
  * 失败(请求报错 / JSON 无效)直接抛出,调用方决定如何处理。
  */
 async function summarizeFloorWork(
   chat: STMessage[],
   aiFloor: number,
   sender: { send: (messages: ChatMsg[]) => Promise<string>; label: string },
-  options: Pick<RunSummaryOptions, 'replaceLeaf' | 'onRequestStart'> = {},
-): Promise<void> {
+  options: Pick<RunSummaryOptions, 'replaceLeaf'> = {},
+): Promise<boolean> {
   const ctx = getContext();
   if (!ctx) throw new Error('无 ST 上下文');
   if (!chat[aiFloor]) {
     throw new Error(`摘要失败:楼层 #${aiFloor} 已不存在(可能在请求期间被删除)`);
   }
 
-  const source = presenceSource(chat, aiFloor, ctx.getCurrentChatId?.() ?? null, ctx.groupId == null ? null : String(ctx.groupId));
+  const chatId = ctx.getCurrentChatId?.() ?? null;
+  const target = chat[aiFloor];
+  const { mes, swipe_id: swipe } = target;
+  const source = presenceSource(chat, aiFloor, chatId, ctx.groupId == null ? null : String(ctx.groupId));
   const covered = options.replaceLeaf ? coveredBeforeFloor(chat, aiFloor) : coveredSet(chat);
   const targets = floorTargets(chat, aiFloor, covered);
   const content = renderMessages(chat, targets, ctx.name1, ctx.name2);
@@ -1213,7 +1125,6 @@ async function summarizeFloorWork(
     { role: 'user', content: prompt.user },
     { role: 'system', content: checklist },
   );
-  options.onRequestStart?.();
   const delta = await sendAndParse(sender.send, messages, raw => {
     console.log('[柏宝书] 摘要原始返回(未清洗):\n', raw);
     const d = extractJsonObject<SummaryDelta>(raw);
@@ -1224,6 +1135,10 @@ async function summarizeFloorWork(
     return { ...d, summary } as SummaryDelta & { summary: string };
   });
 
+  const active = getContext();
+  if (active?.chat !== chat || (active.getCurrentChatId?.() ?? null) !== chatId
+    || chat[aiFloor] !== target || target.mes !== mes || target.swipe_id !== swipe) return false;
+
   applyLeafForFloor(chat, aiFloor, delta, stateBefore, options.replaceLeaf, knowledgeShown, source);
   engineState.lastRunAt = Date.now();
 
@@ -1232,6 +1147,7 @@ async function summarizeFloorWork(
   refreshInjection();
   scheduleLeafFlush();
   scheduleVectorIndex(); // 新叶子 → 防抖同步进向量库(失败静默,不影响摘要)
+  return true;
 }
 
 async function runSummaryInner(aiFloor: number, options: RunSummaryOptions = {}): Promise<void> {
@@ -1257,9 +1173,9 @@ async function runSummaryInner(aiFloor: number, options: RunSummaryOptions = {})
   engineState.running = true;
   engineState.lastError = '';
   try {
-    await summarizeFloorWork(chat, aiFloor, sender, options);
+    const saved = await summarizeFloorWork(chat, aiFloor, sender, options);
     // 摘要积累到阈值则触发总结
-    if (options.checkResummary !== false) await checkResummary();
+    if (saved && options.checkResummary !== false) await checkResummary();
   } catch (e) {
     engineState.lastError = e instanceof Error ? e.message : String(e);
   } finally {
@@ -1875,8 +1791,7 @@ function reactToChatMutation(syncHidden = false): void {
 /**
  * 绑定事件。摘要触发规则:**只确保「上一条已定稿 AI 消息」有摘要**(单楼增量,非全量)。
  * 进入聊天 / 翻到没摘要的页,都不再自动立刻补摘。
- *  - USER_MESSAGE_RENDERED:发新消息 → 摘「上一条 AI」(skipLastAi=false)。
- *  - GENERATION_STARTED(regenerate/swipe):末尾 AI 正在被改写,跳过它 → 摘「之前那条 AI」(skipLastAi=true)。
+ *  - CHARACTER_MESSAGE_RENDERED:AI 回复生成完成后,在后台摘要它之前的 AI 楼。
  *  - MESSAGE_SWIPED / MESSAGE_EDITED:数据随消息跟随 → reactToChatMutation(清坏链+重算+刷新),不在此处生成。
  *  - MESSAGE_DELETED:同上,并同步一次滑动隐藏/取消隐藏。
  *  - CHAT_CHANGED:store 负责重载,这里刷新注入。
@@ -1888,28 +1803,6 @@ export function bindEngine(): void {
   const et = ctx.eventTypes;
 
   normalizeBacklogNotices(ctx.chat ?? []);
-  console.log('[柏宝书] bindEngine 执行,监听', et.USER_MESSAGE_RENDERED, et.GENERATION_STARTED);
-
-  // 发新消息:此刻末尾 AI 是「上一条已定稿」的回复,从最早缺口开始顺序追赶到它。
-  es.on(et.USER_MESSAGE_RENDERED, () => {
-    console.log('[柏宝书] USER_MESSAGE_RENDERED → 摘上一条 AI');
-    void maybeSummarizePrevAi(false);
-  });
-
-  // 重新生成 / 翻页:聊天末尾实际是 AI 时才视为正在改写并跳过;
-  // 末尾是用户楼时(如失败后恢复生成),前一条 AI 已稳定,仍应正常补摘。
-  // ⚠️ 这里放行的 type(quiet/impersonate/continue)必须与 handleGenerationIntercept 第一道闸严格一致——
-  //    两者口径一旦不同步,重生/翻页会出现「补摘」与「正文生成」并行(见拦截器注释的「关键时序/口径」)。
-  if (et.GENERATION_STARTED) {
-    es.on(et.GENERATION_STARTED, (type?: string, _opts?: unknown, dryRun?: boolean) => {
-      if (dryRun) return;
-      if (type === 'quiet' || type === 'impersonate' || type === 'continue') return; // 非真实新回复
-      const chat = getContext()?.chat ?? [];
-      const skipLastAi = shouldSkipLastAiForGeneration(chat, type);
-      console.log('[柏宝书] GENERATION_STARTED → 自动摘要, type =', type, '| skipLastAi =', skipLastAi);
-      void maybeSummarizePrevAi(skipLastAi);
-    });
-  }
 
   // 以下三事件只让数据/UI 跟随,不主动生成摘要。
   if (et.MESSAGE_SWIPED) es.on(et.MESSAGE_SWIPED, () => reactToChatMutation());
@@ -1929,7 +1822,15 @@ export function bindEngine(): void {
 
   // AI 新回复落定:不一定会触发摘要(自动摘要关闭 / 它不是「上一条 AI」),
   // 但「未摘要楼层」列表必须跟上新增的 AI 楼,故无条件重算一次派生缓存(不发请求)。
-  if (et.CHARACTER_MESSAGE_RENDERED) es.on(et.CHARACTER_MESSAGE_RENDERED, () => recomputeDerived());
+  if (et.CHARACTER_MESSAGE_RENDERED) {
+    es.on(et.CHARACTER_MESSAGE_RENDERED, (floor: number, type?: string) => {
+      recomputeDerived();
+      if (type !== undefined && type !== 'normal' && type !== 'regenerate' && type !== 'swipe') return;
+      void maybeSummarizePrevAi(floor).catch(e => {
+        engineState.lastError = e instanceof Error ? e.message : String(e);
+      });
+    });
+  }
 
   if (et.CHAT_CHANGED) {
     es.on(et.CHAT_CHANGED, () => {
